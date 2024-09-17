@@ -22,15 +22,11 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
 from time import sleep
 
-dynamodb = boto3.resource('dynamodb', region_name='ap-northeast-1')
-table = dynamodb.Table('product')
-
 chrome_options = Options()
-# chrome_options.add_argument('--headless')
+chrome_options.add_argument('--headless')
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
 HREFS = []
-product_data = []
 
 # URL開く 
 driver.get("https://www.amazon.co.jp/s?i=electronics&bbn=128188011&rh=n%3A2497181051%2Cp_n_feature_eleven_browse-bin%3A2519089051%2Cp_123%3A110955&dc&ds=v1%3A3k4BPCvrpusaTJGy4t7Mu5coWfgrizh5VW5yqsABypg&qid=1725942426&rnid=23341432051&ref=sr_nr_p_123_2")
@@ -100,22 +96,7 @@ for HREF in HREFS:
     
     #uniqueID
     unique_id = f"AIP-{uuid.uuid4()}"
-    
-    #title
-    try:
-        title = driver.find_element(By.ID,"productTitle").text
-    except NoSuchElementException:
-        title = "NULL"
-    #brand
-    brand = "Apple"
-    #condition
-    try:
-        condition = driver.find_element(By.XPATH,'//*[@id="usedBuySection"]/div[1]/div/span[1]').text
-    except NoSuchElementException:
-        try:
-            condition = driver.find_element(By.XPATH,'//*[@id="renewedSingleOfferCaption_feature_div"]/div/span').text
-        except:
-            condition = "新品"
+
     #price
     try:
         # 最初に、a-offscreenクラスを持つspan要素を探す
@@ -126,48 +107,10 @@ for HREF in HREFS:
             price = driver.find_element(By.XPATH, "//span[@class='a-price']/span[@class='a-offscreen']").text
         except NoSuchElementException:
             try:
-                # さらに、priceBlockBuyingPriceStringクラスを持つspan要素を探す
-                price = driver.find_element(By.XPATH, "//span[contains(@class, 'priceBlockBuyingPriceString')]").text
+                price = driver.find_element(By.XPATH,'//span[@class="a-price a-text-price a-size-medium"]//span[@aria-hidden="true"]').text
             except NoSuchElementException:
-                try:
-                    price = driver.find_element(By.XPATH,'//span[@class="a-price a-text-price a-size-medium"]//span[@aria-hidden="true"]').text
-                except NoSuchElementException:
-                    price = "NULL"
+                price = "NULL"
 
     # 価格のクリーンアップ
     price = ''.join(filter(str.isdigit, price))
-    #img
-    try:
-        img = driver.find_element(By.XPATH,'//div[@id="imgTagWrapperId"]/img').get_attribute("src")
-    except NoSuchElementException:
-        try:
-            img = driver.find_element(By.XPATH,'//img[@id="landingImage"]').get_attribute("src")
-        except:
-            img = "NULL"
-    product_data.append([unique_id,title,brand,price,condition,img,URL])
-
-for item in product_data:
-    unique_id, title, brand, price, condition, img, url = item
-    
-    # DynamoDBに格納するデータ形式に変換
-    item_data = {
-        'product_id': unique_id,
-        'title': title,
-        'brand': brand,
-        'price': Decimal(price) if price and price.replace('.', '').isdigit() else Decimal('0'),
-        'condition': condition,
-        'image_url': img,
-        'product_url': url
-    }
-    
-    # DynamoDBにデータを格納
-    try:
-        table.put_item(Item=item_data)
-        print(f"Successfully added item: {unique_id}")
-    except Exception as e:
-        print(f"Error adding item {unique_id}: {str(e)}")
-
-print("All items have been processed and added to DynamoDB.")
-
-# ブラウザを閉じる
-driver.quit()
+    print(price)
